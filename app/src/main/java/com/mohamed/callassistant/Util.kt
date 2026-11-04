@@ -18,6 +18,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import org.json.JSONObject
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -38,6 +39,45 @@ object Prefs {
     fun setFolder(c: Context, v: String) = sp(c).edit().putString("folder", v.trim()).apply()
     fun inCall(c: Context) = sp(c).getBoolean("inCall", false)
     fun setInCall(c: Context, v: Boolean) = sp(c).edit().putBoolean("inCall", v).apply()
+    fun incoming(c: Context) = sp(c).getBoolean("incoming", false)
+    fun setIncoming(c: Context, v: Boolean) = sp(c).edit().putBoolean("incoming", v).apply()
+
+    // آخر رقم اتصلت بيه (من بث الاتصال الصادر)
+    fun setLastOut(c: Context, n: String) =
+        sp(c).edit().putString("lastOut", n).putLong("lastOutAt", System.currentTimeMillis()).apply()
+    fun lastOut(c: Context): String? {
+        if (System.currentTimeMillis() - sp(c).getLong("lastOutAt", 0L) > 90_000L) return null
+        return sp(c).getString("lastOut", null)?.takeIf { it.isNotBlank() }
+    }
+
+    // أرقام قلت عليها «لأ» لحفظها في جهات الاتصال
+    private fun declinedList(c: Context): List<String> =
+        (sp(c).getString("declined", "") ?: "").split(',').filter { it.isNotBlank() }
+    fun isDeclined(c: Context, number: String): Boolean = tail(number) in declinedList(c)
+    fun markDeclined(c: Context, number: String) {
+        val t = tail(number)
+        if (t.isBlank()) return
+        val l = declinedList(c).toMutableList()
+        if (t !in l) l.add(t)
+        sp(c).edit().putString("declined", l.takeLast(500).joinToString(",")).apply()
+    }
+
+    // الأسماء المسجلة جوه البرنامج (مستقلة عن جهات الاتصال)
+    fun knownName(c: Context, number: String): String? {
+        val t = tail(number)
+        if (t.isBlank()) return null
+        return try {
+            JSONObject(sp(c).getString("names", "{}") ?: "{}").optString(t).ifBlank { null }
+        } catch (e: Exception) { null }
+    }
+    fun setKnownName(c: Context, number: String, name: String) {
+        val t = tail(number)
+        if (t.isBlank() || name.isBlank()) return
+        val j = try { JSONObject(sp(c).getString("names", "{}") ?: "{}") } catch (e: Exception) { JSONObject() }
+        j.put(t, name)
+        sp(c).edit().putString("names", j.toString()).apply()
+    }
+
     private fun doneList(c: Context): List<String> =
         (sp(c).getString("done_v2", "") ?: "").split('\n').filter { it.isNotBlank() }
     fun processed(c: Context): Set<String> = doneList(c).toSet()
@@ -85,11 +125,19 @@ object Fmt {
 
 object Notif {
     const val CH = "calls"
+    const val CH_LIVE = "live"
+    const val LIVE_ID = 7001
+
     fun channels(c: Context) {
         val nm = c.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CH, "ملخصات وتذكيرات", NotificationManager.IMPORTANCE_HIGH))
+        nm.createNotificationChannel(NotificationChannel(CH_LIVE, "آخر مكالمة وقت الاتصال", NotificationManager.IMPORTANCE_HIGH))
     }
-    fun post(c: Context, id: Int, title: String, text: String) {
+
+    fun post(
+        c: Context, id: Int, title: String, text: String,
+        actions: List<NotificationCompat.Action> = emptyList(), ch: String = CH
+    ) {
         if (Build.VERSION.SDK_INT >= 33 && !has(c, Manifest.permission.POST_NOTIFICATIONS)) return
         channels(c)
         val pi = PendingIntent.getActivity(
@@ -97,16 +145,48 @@ object Notif {
             Intent(c, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val n = NotificationCompat.Builder(c, CH)
+        val b = NotificationCompat.Builder(c, ch)
             .setSmallIcon(R.drawable.ic_stat)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(pi)
             .setAutoCancel(true)
+            .setOnlyAlertOnce(ch == CH_LIVE)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setColor(0xFF0E7C86.toInt())
-            .build()
-        try { NotificationManagerCompat.from(c).notify(id, n) } catch (e: SecurityException) { }
+        actions.forEach { b.addAction(it) }
+        try { NotificationManagerCompat.from(c).notify(id, b.build()) } catch (e: SecurityException) { }
+    }
+
+    /** زر في الإشعار بيبعت للـ ActionReceiver */
+    fun receiverAction(c: Context, label: String, action: String, recId: String, nid: Int): NotificationCompat.Action {
+        val i = Intent(c, ActionReceiver::class.java)
+            .setAction(action)
+            .putExtra("id", recId)
+            .putExtra("nid", nid)
+        val pi = PendingIntent.getBroadcast(
+            c, (action + recId).hashCode(), i,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Action.Builder(0, label, pi).build()
+    }
+
+    /** إشعار آخر مكالمة وقت المكالمة (احتياطي لو النافذة العائمة ما ظهرتش) */
+    fun live(c: Context, r: CallRecord, who: String) {
+        val sb = StringBuilder(r.summary)
+        if (r.apptMs > System.currentTimeMillis()) {
+            sb.append("\nموعد: ").append(Fmt.dateShort(r.apptMs)).append(' ').append(Fmt.time(r.apptMs))
+        }
+        post(
+            c, LIVE_ID,
+            who + " • آخر مكالمة " + Fmt.dayLabel(r.startMs) + " " + Fmt.time(r.startMs),
+            sb.toString(), ch = CH_LIVE
+        )
+    }
+
+    fun clearLive(c: Context) {
+        NotificationManagerCompat.from(c).cancel(LIVE_ID)
     }
 }
 

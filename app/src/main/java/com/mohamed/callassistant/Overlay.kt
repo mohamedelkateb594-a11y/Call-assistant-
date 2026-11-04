@@ -15,16 +15,21 @@ import android.widget.TextView
 
 object Overlay {
     private var v: View? = null
+    private var key = ""
+
+    fun visible(): Boolean = v != null
+    fun isShowing(number: String): Boolean = v != null && key.isNotEmpty() && key == tail(number)
 
     fun hide(c: Context) {
         val x = v ?: return
         v = null
+        key = ""
         try {
             (c.applicationContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager).removeView(x)
         } catch (e: Exception) { }
     }
 
-    fun show(c: Context, r: CallRecord, who: String, autoHideMs: Long = 0) {
+    fun show(c: Context, r: CallRecord, who: String, autoHideMs: Long = 0, number: String = "") {
         val app = c.applicationContext
         if (!Settings.canDrawOverlays(app)) return
         hide(app)
@@ -86,6 +91,7 @@ object Overlay {
         try {
             (app.getSystemService(Context.WINDOW_SERVICE) as WindowManager).addView(box, lp)
             v = box
+            key = tail(number)
             box.animate().alpha(1f).translationY(0f).setDuration(260).start()
             if (autoHideMs > 0) box.postDelayed({ hide(app) }, autoHideMs)
         } catch (e: Exception) { }

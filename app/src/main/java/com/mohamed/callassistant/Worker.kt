@@ -43,6 +43,22 @@ object CallLogs {
         } catch (e: Exception) { }
         return if (bestDiff < 3 * 60_000L) best else null
     }
+
+    /** آخر رقم اتصلت بيه بعد وقت معيّن (بيتستخدم وقت المكالمة الصادرة) */
+    fun recentOutgoing(c: Context, sinceMs: Long): String? {
+        if (!has(c, Manifest.permission.READ_CALL_LOG)) return null
+        return try {
+            c.contentResolver.query(
+                CallLog.Calls.CONTENT_URI,
+                arrayOf(CallLog.Calls.NUMBER, CallLog.Calls.DATE),
+                "${CallLog.Calls.TYPE}=? AND ${CallLog.Calls.DATE}>=?",
+                arrayOf(CallLog.Calls.OUTGOING_TYPE.toString(), sinceMs.toString()),
+                "${CallLog.Calls.DATE} DESC"
+            )?.use { cur ->
+                if (cur.moveToFirst()) cur.getString(0)?.takeIf { it.isNotBlank() } else null
+            }
+        } catch (e: Exception) { null }
+    }
 }
 
 object Recordings {
@@ -90,7 +106,8 @@ object Pipeline {
 
     private fun fail(c: Context, id: String, number: String, start: Long, dur: Int, f: File, msg: String) {
         val old = Store.items.firstOrNull { it.id == id }
-        Store.upsert(c, CallRecord(id, number, old?.name, start, dur, "ما اتلخصتش", "", emptyList(), "", 0L, "", f.path, "failed", msg))
+        val nm = old?.name ?: Prefs.knownName(c, number)
+        Store.upsert(c, CallRecord(id, number, nm, start, dur, "ما اتلخصتش", "", emptyList(), "", 0L, "", f.path, "failed", msg))
         Prefs.markProcessed(c, f.path)
         Notif.post(c, id.hashCode(), "ما قدرتش ألخّص مكالمة", msg)
     }
@@ -115,17 +132,21 @@ object Pipeline {
             val a = Gemini.analyze(c, f)
             val saved = Contacts.nameFor(c, number)
             val cn = a.callerName
-            if (saved == null && cn != null && number.isNotBlank() && has(c, Manifest.permission.WRITE_CONTACTS)) {
-                Contacts.save(c, cn, number)
-            }
-            val name = saved ?: cn ?: old?.name
+            // الاسم اللي قاله المتصل بيتسجل جوه البرنامج دايماً، بغض النظر عن جهات الاتصال
+            if (cn != null && number.isNotBlank()) Prefs.setKnownName(c, number, cn)
+            val name = saved ?: cn ?: old?.name ?: Prefs.knownName(c, number)
             val apptRaw = parseIso(a.apptIso)
             val appt = if (apptRaw > System.currentTimeMillis()) apptRaw else 0L
-            val rec = CallRecord(id, number, name, start, dur, a.title, a.summary, a.keyPoints, a.transcript, appt, a.apptNote, f.path, "done", "")
+            val rec = CallRecord(
+                id, number, name, start, dur, a.title, a.summary, a.keyPoints, a.transcript,
+                appt, a.apptNote, f.path, "done", "", if (appt > 0) "pending" else ""
+            )
             Store.upsert(c, rec)
             Prefs.markProcessed(c, f.path)
-            if (appt > 0) Remind.schedule(c, rec)
             Notif.post(c, id.hashCode(), "ملخص مكالمة " + (name ?: number.ifBlank { "رقم مجهول" }), a.summary)
+            // تأكيدات آخر المكالمة
+            Contacts.ask(c, rec)
+            if (appt > 0) Remind.ask(c, rec)
             return DONE
         } catch (e: IOException) {
             if (!finalAttempt) return RETRY

@@ -8,6 +8,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
+/**
+ * apptState: "" (سجل قديم، كان بيتحفظ تلقائي) | "pending" (مستني تأكيدك) | "saved" | "skipped"
+ */
 data class CallRecord(
     val id: String,
     val number: String,
@@ -22,7 +25,8 @@ data class CallRecord(
     val apptNote: String,
     val file: String,
     val status: String,
-    val error: String
+    val error: String,
+    val apptState: String = ""
 )
 
 object Store {
@@ -35,6 +39,7 @@ object Store {
         .put("summary", r.summary).put("points", JSONArray(r.keyPoints))
         .put("transcript", r.transcript).put("appt", r.apptMs).put("note", r.apptNote)
         .put("file", r.file).put("status", r.status).put("error", r.error)
+        .put("apptState", r.apptState)
 
     private fun fromJson(j: JSONObject): CallRecord {
         val p = j.optJSONArray("points")
@@ -44,7 +49,8 @@ object Store {
             j.optString("id"), j.optString("number"), j.optString("name").ifBlank { null },
             j.optLong("start"), j.optInt("dur"), j.optString("title"), j.optString("summary"),
             pts, j.optString("transcript"), j.optLong("appt"), j.optString("note"),
-            j.optString("file"), j.optString("status", "done"), j.optString("error")
+            j.optString("file"), j.optString("status", "done"), j.optString("error"),
+            j.optString("apptState")
         )
     }
 
