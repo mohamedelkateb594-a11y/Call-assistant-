@@ -213,7 +213,7 @@ fun Home(onOpen: (String) -> Unit, goSettings: () -> Unit) {
     var q by remember { mutableStateOf("") }
     val all = Store.items
     val now = System.currentTimeMillis()
-    val upcoming = all.count { it.apptMs > now }
+    val upcoming = all.count { it.apptMs > now && it.apptState != "skipped" }
     val needle = q.trim()
     val list = if (needle.isEmpty()) all else all.filter { r ->
         listOf(r.name ?: "", r.number, r.summary, r.title, r.transcript).any { it.contains(needle, true) }
@@ -294,7 +294,7 @@ fun CallCard(r: CallRecord, onClick: () -> Unit) {
                 color = pal.sub, fontSize = 14.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis
             )
             if (r.status != "done") Chip("ما اتلخصتش — افتحها وجرّب تاني", pal.coralTint, pal.coralInk)
-            else if (r.apptMs > 0) Chip("موعد: " + Fmt.dateShort(r.apptMs) + " " + Fmt.time(r.apptMs), pal.coralTint, pal.coralInk)
+            else if (r.apptMs > 0 && r.apptState != "skipped") Chip("موعد: " + Fmt.dateShort(r.apptMs) + " " + Fmt.time(r.apptMs), pal.coralTint, pal.coralInk)
         }
     }
 }
@@ -306,7 +306,12 @@ fun Detail(r: CallRecord, onBack: () -> Unit) {
     val pal = LocalPal.current
     var showT by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
+    var contactSaved by remember { mutableStateOf(false) }
     val label = r.name ?: r.number.ifBlank { "رقم مجهول" }.let { if (r.number.isBlank()) it else ltr(it) }
+    val canSaveContact = remember(r.id, contactSaved) {
+        !contactSaved && r.number.isNotBlank() &&
+            has(c, Manifest.permission.READ_CONTACTS) && Contacts.nameFor(c, r.number) == null
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Column(
@@ -351,7 +356,32 @@ fun Detail(r: CallRecord, onBack: () -> Unit) {
                     Text(Fmt.dateShort(r.apptMs) + " • " + Fmt.time(r.apptMs), color = pal.coralInk, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     if (r.apptNote.isNotBlank()) Text(r.apptNote, color = pal.coralInk, fontSize = 14.sp)
                     Spacer(Modifier.height(6.dp))
-                    Text("اتحط له تذكير تلقائي قبلها بنص ساعة", color = pal.coralInk, fontSize = 12.sp)
+                    if (r.apptState == "pending" || r.apptState == "skipped") {
+                        Text(
+                            if (r.apptState == "pending") "لسه ما اتحفظش في التقويم" else "مش محفوظ في التقويم",
+                            color = pal.coralInk, fontSize = 12.sp
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = {
+                                    if (Remind.canCalendar(c)) {
+                                        val ok = Remind.confirm(c, r)
+                                        Toast.makeText(c, if (ok) "اتحفظ في التقويم" else "ما قدرتش أحفظ الموعد", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        c.startActivity(Remind.insertIntent(r))
+                                    }
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Teal)
+                            ) { Text("احفظه في التقويم") }
+                            if (r.apptState == "pending") TextButton(onClick = { Store.upsert(c, r.copy(apptState = "skipped")) }) {
+                                Text("لأ", color = pal.coralInk)
+                            }
+                        }
+                    } else {
+                        Text("اتحفظ في التقويم وهيجيلك تذكير قبلها بنص ساعة", color = pal.coralInk, fontSize = 12.sp)
+                    }
                 }
                 if (r.transcript.isNotBlank()) Column(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(pal.card).animateContentSize()
@@ -377,6 +407,20 @@ fun Detail(r: CallRecord, onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth()
                 ) { Icon(Icons.Rounded.Refresh, null); Spacer(Modifier.width(8.dp)); Text("حاول تاني") }
             }
+            if (canSaveContact) OutlinedButton(
+                onClick = {
+                    val nm = r.name
+                    if (nm != null && has(c, Manifest.permission.WRITE_CONTACTS)) {
+                        val ok = Contacts.save(c, nm, r.number)
+                        Toast.makeText(c, if (ok) "اتحفظ في جهات الاتصال" else "ما قدرتش أحفظ الرقم", Toast.LENGTH_SHORT).show()
+                        if (ok) contactSaved = true
+                    } else {
+                        c.startActivity(Contacts.insertIntent(nm, r.number))
+                    }
+                },
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) { Icon(Icons.Rounded.Add, null); Spacer(Modifier.width(8.dp)); Text("احفظ الرقم في جهات الاتصال") }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (r.number.isNotBlank()) Button(
                     onClick = { c.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(r.number)))) },
@@ -407,8 +451,8 @@ fun Detail(r: CallRecord, onBack: () -> Unit) {
 fun Appts(onOpen: (String) -> Unit) {
     val pal = LocalPal.current
     val now = System.currentTimeMillis()
-    val up = Store.items.filter { it.apptMs > now }.sortedBy { it.apptMs }
-    val past = Store.items.filter { it.apptMs in 1..now }.sortedByDescending { it.apptMs }.take(10)
+    val up = Store.items.filter { it.apptMs > now && it.apptState != "skipped" }.sortedBy { it.apptMs }
+    val past = Store.items.filter { it.apptMs in 1..now && it.apptState != "skipped" }.sortedByDescending { it.apptMs }.take(10)
     Column(Modifier.fillMaxSize()) {
         Header("مواعيدك", if (up.isEmpty()) "مفيش مواعيد جاية" else "${up.size} موعد جاي")
         LazyColumn(
@@ -416,7 +460,7 @@ fun Appts(onOpen: (String) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (up.isEmpty() && past.isEmpty()) item {
-                EmptyState("مفيش مواعيد", "لما تتفق مع حد على ميعاد في المكالمة هيتسجل هنا وهييجيلك تذكير.")
+                EmptyState("مفيش مواعيد", "لما تتفق مع حد على ميعاد في المكالمة هسألك تحفظه في التقويم ولا لأ.")
             }
             items(up, key = { r -> "u" + r.id }) { r -> ApptCard(r, false) { onOpen(r.id) } }
             if (past.isNotEmpty()) {
@@ -449,6 +493,7 @@ fun ApptCard(r: CallRecord, past: Boolean, onClick: () -> Unit) {
             Text(label, color = pal.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (r.apptNote.isNotBlank()) Text(r.apptNote, color = pal.sub, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(Fmt.dateShort(r.apptMs) + " • " + Fmt.time(r.apptMs), color = pal.sub, fontSize = 12.sp)
+            if (r.apptState == "pending") Text("لسه ما اتحفظش في التقويم", color = pal.coralInk, fontSize = 12.sp)
         }
     }
 }
@@ -490,6 +535,7 @@ fun SettingsScreen() {
 
     val p1 = listOf(
         Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG,
+        Manifest.permission.PROCESS_OUTGOING_CALLS,
         Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS
     ).all { has(c, it) }
     val p2 = has(c, Manifest.permission.WRITE_CALENDAR) && has(c, Manifest.permission.READ_CALENDAR) &&
@@ -525,9 +571,10 @@ fun SettingsScreen() {
                 )
             }
             Section("الأذونات") {
-                PermRow("الاتصال والسجل وجهات الاتصال", "عشان أعرف الرقم وأحفظ الاسم", p1) {
+                PermRow("الاتصال والسجل وجهات الاتصال", "عشان أعرف الرقم (وارد وصادر) وأحفظ الاسم", p1) {
                     launcher.launch(arrayOf(
                         Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG,
+                        Manifest.permission.PROCESS_OUTGOING_CALLS,
                         Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS
                     ))
                 }
