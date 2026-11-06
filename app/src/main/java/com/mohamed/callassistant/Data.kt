@@ -60,7 +60,13 @@ object Store {
         if (!fl.exists()) { items = emptyList(); return }
         try {
             val arr = JSONArray(fl.readText())
-            items = (0 until arr.length()).map { fromJson(arr.getJSONObject(it)) }.sortedByDescending { it.startMs }
+            items = (0 until arr.length())
+                .map { fromJson(arr.getJSONObject(it)) }
+                // المكالمات القديمة بدون اسم تاخد الاسم المسجل جوه البرنامج لنفس الرقم
+                .map { r ->
+                    if (r.name == null && r.number.isNotBlank()) r.copy(name = Prefs.knownName(c, r.number)) else r
+                }
+                .sortedByDescending { it.startMs }
         } catch (e: Exception) { }
     }
 
