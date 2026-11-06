@@ -6,13 +6,11 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,12 +29,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -70,79 +66,20 @@ val Avatars = listOf(
 
 var tick by mutableIntStateOf(0)
 
-@Composable
-fun App() {
-    val dark = isSystemInDarkTheme()
-    val pal = if (dark) DarkPal else LightPal
-    val scheme = if (dark) darkColorScheme(primary = Teal, background = pal.bg, surface = pal.card)
-    else lightColorScheme(primary = Teal, background = pal.bg, surface = pal.card)
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl, LocalPal provides pal) {
-        MaterialTheme(colorScheme = scheme) { Root() }
-    }
-}
-
-@Composable
-fun Root() {
-    val pal = LocalPal.current
-    var tab by remember { mutableIntStateOf(0) }
-    var openId by remember { mutableStateOf<String?>(null) }
-    val open = openId?.let { id -> Store.items.firstOrNull { it.id == id } }
-    BackHandler(enabled = open != null) { openId = null }
-    Box(Modifier.fillMaxSize().background(pal.bg)) {
-        if (open != null) {
-            Detail(open) { openId = null }
-        } else {
-            Scaffold(containerColor = pal.bg, bottomBar = { NavBar(tab) { tab = it } }) { pad ->
-                Box(Modifier.padding(bottom = pad.calculateBottomPadding())) {
-                    when (tab) {
-                        0 -> Home(onOpen = { openId = it }, goSettings = { tab = 2 })
-                        1 -> Appts { openId = it }
-                        else -> SettingsScreen()
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun NavBar(sel: Int, onSel: (Int) -> Unit) {
-    val pal = LocalPal.current
-    NavigationBar(containerColor = pal.card, tonalElevation = 0.dp) {
-        val items = listOf(
-            "المكالمات" to Icons.Rounded.Call,
-            "المواعيد" to Icons.Rounded.Event,
-            "الإعدادات" to Icons.Rounded.Settings
-        )
-        items.forEachIndexed { i, (label, icon) ->
-            NavigationBarItem(
-                selected = sel == i,
-                onClick = { onSel(i) },
-                icon = { Icon(icon, null) },
-                label = { Text(label, fontSize = 12.sp) },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = pal.tint,
-                    selectedIconColor = pal.accent, selectedTextColor = pal.accent,
-                    unselectedIconColor = pal.sub, unselectedTextColor = pal.sub
-                )
-            )
-        }
-    }
-}
+// (App / Root / شريط التابات اتنقلوا لملف Shell.kt)
 
 // ---------- Shared pieces ----------
 val HeaderBrush = Brush.linearGradient(listOf(Deep, Color(0xFF0D6470), Teal))
 val HeaderShape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
 
+/** عنوان الصفحة جوه الورقة البيضاء (الهيدر الملون بقى في Shell) */
 @Composable
 fun Header(title: String, sub: String, content: @Composable ColumnScope.() -> Unit = {}) {
-    Column(
-        Modifier.fillMaxWidth().background(HeaderBrush, HeaderShape).statusBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 18.dp)
-    ) {
-        Text(title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+    val pal = LocalPal.current
+    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 4.dp)) {
+        Text(title, color = pal.ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(2.dp))
-        Text(sub, color = Color.White.copy(alpha = 0.78f), fontSize = 14.sp)
+        Text(sub, color = pal.sub, fontSize = 14.sp)
         content()
     }
 }
@@ -230,13 +167,13 @@ fun Home(onOpen: (String) -> Unit, goSettings: () -> Unit) {
             TextField(
                 value = q, onValueChange = { q = it }, singleLine = true,
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
-                placeholder = { Text("دوّر بالاسم أو الرقم أو الكلام", color = Color.White.copy(alpha = 0.65f)) },
-                leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = 0.8f)) },
+                placeholder = { Text("دوّر بالاسم أو الرقم أو الكلام", color = pal.sub) },
+                leadingIcon = { Icon(Icons.Rounded.Search, null, tint = pal.sub) },
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White.copy(alpha = 0.16f),
-                    unfocusedContainerColor = Color.White.copy(alpha = 0.12f),
-                    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                    cursorColor = Color.White,
+                    focusedContainerColor = pal.card,
+                    unfocusedContainerColor = pal.card,
+                    focusedTextColor = pal.ink, unfocusedTextColor = pal.ink,
+                    cursorColor = pal.accent,
                     focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent
                 )
             )
@@ -358,7 +295,7 @@ fun Detail(r: CallRecord, onBack: () -> Unit) {
                     Spacer(Modifier.height(6.dp))
                     if (r.apptState == "pending" || r.apptState == "skipped") {
                         Text(
-                            if (r.apptState == "pending") "لسه ما اتحفظش في التقويم" else "مش محفوظ في التقويم",
+                            if (r.apptState == "pending") "لسه ما اتحفش في التقويم" else "مش محفوظ في التقويم",
                             color = pal.coralInk, fontSize = 12.sp
                         )
                         Spacer(Modifier.height(8.dp))
@@ -493,7 +430,7 @@ fun ApptCard(r: CallRecord, past: Boolean, onClick: () -> Unit) {
             Text(label, color = pal.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (r.apptNote.isNotBlank()) Text(r.apptNote, color = pal.sub, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(Fmt.dateShort(r.apptMs) + " • " + Fmt.time(r.apptMs), color = pal.sub, fontSize = 12.sp)
-            if (r.apptState == "pending") Text("لسه ما اتحفظش في التقويم", color = pal.coralInk, fontSize = 12.sp)
+            if (r.apptState == "pending") Text("لسه ما اتحفش في التقويم", color = pal.coralInk, fontSize = 12.sp)
         }
     }
 }
