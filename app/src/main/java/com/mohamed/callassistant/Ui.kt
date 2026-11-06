@@ -295,7 +295,7 @@ fun Detail(r: CallRecord, onBack: () -> Unit) {
                     Spacer(Modifier.height(6.dp))
                     if (r.apptState == "pending" || r.apptState == "skipped") {
                         Text(
-                            if (r.apptState == "pending") "لسه ما اتحفش في التقويم" else "مش محفوظ في التقويم",
+                            if (r.apptState == "pending") "لسه ما اتحفظش في التقويم" else "مش محفوظ في التقويم",
                             color = pal.coralInk, fontSize = 12.sp
                         )
                         Spacer(Modifier.height(8.dp))
@@ -430,7 +430,7 @@ fun ApptCard(r: CallRecord, past: Boolean, onClick: () -> Unit) {
             Text(label, color = pal.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (r.apptNote.isNotBlank()) Text(r.apptNote, color = pal.sub, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(Fmt.dateShort(r.apptMs) + " • " + Fmt.time(r.apptMs), color = pal.sub, fontSize = 12.sp)
-            if (r.apptState == "pending") Text("لسه ما اتحفش في التقويم", color = pal.coralInk, fontSize = 12.sp)
+            if (r.apptState == "pending") Text("لسه ما اتحفظش في التقويم", color = pal.coralInk, fontSize = 12.sp)
         }
     }
 }
