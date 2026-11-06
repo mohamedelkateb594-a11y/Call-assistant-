@@ -37,8 +37,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 // ---------- Theme ----------
-val Teal = Color(0xFF0E7C86)
-val Deep = Color(0xFF0B3C49)
+// الباليت: كحلي عميق + نيلي للأسطح والعناوين + مرجاني للأزرار والتنبيهات
+// (الاسم Teal فضل زي ما هو عشان باقي الملفات، بس قيمته بقت المرجاني الأساسي)
+val Teal = Color(0xFFE8505B)
+val Deep = Color(0xFF15173D)
 
 class Pal(
     val bg: Color, val card: Color, val ink: Color, val sub: Color,
@@ -46,22 +48,22 @@ class Pal(
 )
 
 val LightPal = Pal(
-    Color(0xFFF2F7F8), Color.White, Color(0xFF10222B), Color(0xFF55707B),
-    Color(0xFFDDF1F2), Color(0xFF0B6A73), Color(0xFFFFE9E2), Color(0xFFA8431F)
+    Color(0xFFF4F5FB), Color.White, Color(0xFF16182F), Color(0xFF5F6285),
+    Color(0xFFE6E8FA), Color(0xFF3D42B0), Color(0xFFFFE7E8), Color(0xFFB02F3A)
 )
 val DarkPal = Pal(
-    Color(0xFF0A171C), Color(0xFF12262D), Color(0xFFE6F1F2), Color(0xFF8FA9B2),
-    Color(0xFF173B42), Color(0xFF7FD6DD), Color(0xFF3A2620), Color(0xFFFFA68D)
+    Color(0xFF0E1026), Color(0xFF181B3D), Color(0xFFE9EAFB), Color(0xFF9EA1C9),
+    Color(0xFF262A66), Color(0xFFB4B8FF), Color(0xFF3D2233), Color(0xFFFF9AA2)
 )
 val LocalPal = compositionLocalOf { LightPal }
 
 val Avatars = listOf(
-    listOf(Color(0xFF14919B), Color(0xFF0B3C49)),
-    listOf(Color(0xFF3B82C4), Color(0xFF1B3F73)),
-    listOf(Color(0xFF6C6FD6), Color(0xFF35378F)),
-    listOf(Color(0xFF22A58F), Color(0xFF0F5F58)),
-    listOf(Color(0xFF4A9CC0), Color(0xFF1F5673)),
-    listOf(Color(0xFF8A7BDB), Color(0xFF4A3F9B))
+    listOf(Color(0xFF5B5FE0), Color(0xFF2B2E7E)),
+    listOf(Color(0xFFE8505B), Color(0xFF9E2A3C)),
+    listOf(Color(0xFF8B5CF6), Color(0xFF4C2A9E)),
+    listOf(Color(0xFF3F8EF2), Color(0xFF1E3F8F)),
+    listOf(Color(0xFFF2905B), Color(0xFFA04A2A)),
+    listOf(Color(0xFF6C74E8), Color(0xFF343A9A))
 )
 
 var tick by mutableIntStateOf(0)
@@ -69,7 +71,7 @@ var tick by mutableIntStateOf(0)
 // (App / Root / شريط التابات اتنقلوا لملف Shell.kt)
 
 // ---------- Shared pieces ----------
-val HeaderBrush = Brush.linearGradient(listOf(Deep, Color(0xFF0D6470), Teal))
+val HeaderBrush = Brush.linearGradient(listOf(Deep, Color(0xFF1F2366), Color(0xFF2F3394)))
 val HeaderShape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
 
 /** عنوان الصفحة جوه الورقة البيضاء (الهيدر الملون بقى في Shell) */

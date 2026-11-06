@@ -48,7 +48,7 @@ object Overlay {
             setPadding(px(18), px(16), px(18), px(10))
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                intArrayOf(0xFF0B3C49.toInt(), 0xFF0E7C86.toInt())
+                intArrayOf(0xFF15173D.toInt(), 0xFF2F3394.toInt())
             ).apply { cornerRadius = px(22).toFloat() }
             elevation = px(8).toFloat()
         }
@@ -62,7 +62,7 @@ object Overlay {
             setLineSpacing(px(3).toFloat(), 1f)
         })
         if (r.apptMs > System.currentTimeMillis()) {
-            card.addView(tv("موعد: ${Fmt.dateShort(r.apptMs)} ${Fmt.time(r.apptMs)}", 13f, 0xFFFFB199.toInt(), true).apply {
+            card.addView(tv("موعد: ${Fmt.dateShort(r.apptMs)} ${Fmt.time(r.apptMs)}", 13f, 0xFFFF9AA2.toInt(), true).apply {
                 setPadding(0, px(8), 0, 0)
             })
         }
