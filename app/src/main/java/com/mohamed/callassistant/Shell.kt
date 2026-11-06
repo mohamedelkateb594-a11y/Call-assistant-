@@ -49,18 +49,18 @@ private fun PagerState.pos(): Float =
 
 // ---------- App ----------
 @Composable
-fun App() {
+fun CallAssistantApp() {
     val dark = isSystemInDarkTheme()
     val pal = if (dark) DarkPal else LightPal
     val scheme = if (dark) darkColorScheme(primary = Teal, background = pal.bg, surface = pal.card)
     else lightColorScheme(primary = Teal, background = pal.bg, surface = pal.card)
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl, LocalPal provides pal) {
-        MaterialTheme(colorScheme = scheme) { Root() }
+        MaterialTheme(colorScheme = scheme) { AppRoot() }
     }
 }
 
 @Composable
-fun Root() {
+fun AppRoot() {
     val pal = LocalPal.current
     val pager = rememberPagerState { TABS }
     val scope = rememberCoroutineScope()

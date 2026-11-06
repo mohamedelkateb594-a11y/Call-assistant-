@@ -13,7 +13,7 @@ class MainActivity : ComponentActivity() {
         Notif.channels(this)
         Store.load(this)
         if (Prefs.apiKey(this).isNotBlank()) Jobs.scan(this, 1)
-        setContent { App() }
+        setContent { CallAssistantApp() }
     }
 
     override fun onResume() {
