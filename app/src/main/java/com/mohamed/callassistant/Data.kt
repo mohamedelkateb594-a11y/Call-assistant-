@@ -13,6 +13,7 @@ data class TaskItem(val text: String, val mine: Boolean, val dueMs: Long, val do
 
 /**
  * apptState: "" (سجل قديم، كان بيتحفظ تلقائي) | "pending" (مستني تأكيدك) | "saved" | "skipped"
+ * callCount: كام مكالمة اندمجت في الملخص ده (نفس الرقم بيحدّث ملخصه بدل ما يعمل ملخص جديد)
  */
 data class CallRecord(
     val id: String,
@@ -33,7 +34,8 @@ data class CallRecord(
     val tasks: List<TaskItem> = emptyList(),
     val facts: List<String> = emptyList(),
     val category: String = "",
-    val starred: Boolean = false
+    val starred: Boolean = false,
+    val callCount: Int = 1
 )
 
 object Store {
@@ -53,7 +55,7 @@ object Store {
             .put("file", r.file).put("status", r.status).put("error", r.error)
             .put("apptState", r.apptState)
             .put("tasks", tasks).put("facts", JSONArray(r.facts))
-            .put("cat", r.category).put("star", r.starred)
+            .put("cat", r.category).put("star", r.starred).put("cnt", r.callCount)
     }
 
     private fun fromJson(j: JSONObject): CallRecord {
@@ -77,7 +79,8 @@ object Store {
             pts, j.optString("transcript"), j.optLong("appt"), j.optString("note"),
             j.optString("file"), j.optString("status", "done"), j.optString("error"),
             j.optString("apptState"),
-            tasks, facts, j.optString("cat"), j.optBoolean("star")
+            tasks, facts, j.optString("cat"), j.optBoolean("star"),
+            callCount = j.optInt("cnt", 1).coerceAtLeast(1)
         )
     }
 
