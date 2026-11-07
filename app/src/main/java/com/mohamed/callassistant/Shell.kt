@@ -17,8 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Call
-import androidx.compose.material.icons.rounded.Event
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,7 +39,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private const val TABS = 3
+private const val TABS = 4
 
 /** موضع الصفحة الحالي كرقم عشري (بيتحرك مع السحب لحظة بلحظة) */
 private fun PagerState.pos(): Float =
@@ -64,15 +62,24 @@ fun AppRoot() {
     val pal = LocalPal.current
     val pager = rememberPagerState { TABS }
     val scope = rememberCoroutineScope()
-    var openId by remember { mutableStateOf<String?>(null) }
-    val open = openId?.let { id -> Store.items.firstOrNull { it.id == id } }
-    BackHandler(enabled = open != null) { openId = null }
-    BackHandler(enabled = open == null && pager.currentPage != 0) {
+    // مكدّس الشاشات الفرعية: "c:<id>" تفاصيل مكالمة، "p:<رقم>" ملف شخص، "ask" اسأل
+    val stack = remember { mutableStateListOf<String>() }
+    val top = stack.lastOrNull()
+    val nav: (String) -> Unit = { stack.add(it) }
+    val back: () -> Unit = { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
+    BackHandler(enabled = top != null) { back() }
+    BackHandler(enabled = top == null && pager.currentPage != 0) {
         scope.launch { pager.animateScrollToPage(0) }
     }
     Box(Modifier.fillMaxSize().background(pal.bg)) {
-        if (open != null) {
-            Detail(open) { openId = null }
+        if (top != null && top.startsWith("c:")) {
+            val rec = Store.items.firstOrNull { it.id == top.removePrefix("c:") }
+            if (rec != null) Detail(rec, back, nav)
+            LaunchedEffect(top, rec == null) { if (rec == null) back() }
+        } else if (top != null && top.startsWith("p:")) {
+            PersonScreen(top.removePrefix("p:"), back) { id -> nav("c:" + id) }
+        } else if (top == "ask") {
+            AskScreen(back)
         } else {
             val done = Store.items.count { it.status == "done" }
             Column(Modifier.fillMaxSize().background(HeaderBrush)) {
@@ -85,7 +92,7 @@ fun AppRoot() {
                             val side = 16.dp.toPx()
                             val tabW = (size.width - 2 * side) / TABS
                             val cx = side + (TABS - 0.5f - pager.pos()) * tabW
-                            shape = NotchShape(cx, tabW * 0.28f, 12.dp.toPx(), 28.dp.toPx(), 12.dp.toPx())
+                            shape = NotchShape(cx, tabW * 0.28f, 12.dp.toPx(), 24.dp.toPx(), 12.dp.toPx())
                             clip = true
                         }
                         .background(pal.bg)
@@ -100,8 +107,13 @@ fun AppRoot() {
                             }
                         ) {
                             when (page) {
-                                0 -> Home(onOpen = { openId = it }, goSettings = { scope.launch { pager.animateScrollToPage(2) } })
-                                1 -> Appts { openId = it }
+                                0 -> Home(
+                                    onOpen = { nav("c:" + it) },
+                                    goSettings = { scope.launch { pager.animateScrollToPage(3) } },
+                                    onAsk = { nav("ask") }
+                                )
+                                1 -> TasksScreen { nav("c:" + it) }
+                                2 -> Appts { nav("c:" + it) }
                                 else -> SettingsScreen()
                             }
                         }
@@ -140,11 +152,7 @@ fun TopBar(sub: String) {
 // ---------- Tabs (الشريط اللي فوق + المؤشر المتحرك) ----------
 @Composable
 fun TabStrip(pager: PagerState, onTab: (Int) -> Unit) {
-    val items = listOf(
-        "المكالمات" to Icons.Rounded.Call,
-        "المواعيد" to Icons.Rounded.Event,
-        "الإعدادات" to Icons.Rounded.Settings
-    )
+    val labels = listOf("المكالمات", "المهام", "المواعيد", "الإعدادات")
     // الحساب كله بإحداثيات فعلية (شمال→يمين) عشان المؤشر والنتوء يتطابقوا بالظبط
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         BoxWithConstraints(
@@ -177,9 +185,7 @@ fun TabStrip(pager: PagerState, onTab: (Int) -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(items[i].second, null, tint = tint, modifier = Modifier.size(17.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(items[i].first, color = tint, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        Text(labels[i], color = tint, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
             }
