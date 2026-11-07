@@ -31,7 +31,11 @@ fun allFiles(c: Context): Boolean =
 
 object Prefs {
     private fun sp(c: Context) = c.getSharedPreferences("prefs", Context.MODE_PRIVATE)
-    fun apiKey(c: Context) = sp(c).getString("key", "") ?: ""
+
+    /** المفتاح المدمج في البناء لو موجود، ولو مش موجود بنرجع للمفتاح اللي اتكتب في الإعدادات */
+    fun hasBuiltInKey(): Boolean = BuildConfig.GEMINI_API_KEY.isNotBlank()
+    fun apiKey(c: Context): String =
+        BuildConfig.GEMINI_API_KEY.ifBlank { sp(c).getString("key", "") ?: "" }
     fun setApiKey(c: Context, v: String) = sp(c).edit().putString("key", v.trim()).apply()
     fun model(c: Context): String = (sp(c).getString("model", "") ?: "").ifBlank { "gemini-2.5-flash" }
     fun setModel(c: Context, v: String) = sp(c).edit().putString("model", v.trim()).apply()
@@ -103,6 +107,10 @@ object Fmt {
     }
     fun dayNum(ms: Long) = cal(ms).get(Calendar.DAY_OF_MONTH).toString()
     fun month(ms: Long) = months[cal(ms).get(Calendar.MONTH)]
+    fun monthKey(ms: Long): Int {
+        val c = cal(ms)
+        return c.get(Calendar.YEAR) * 100 + c.get(Calendar.MONTH)
+    }
     fun dateShort(ms: Long): String {
         val c = cal(ms)
         return "${days[c.get(Calendar.DAY_OF_WEEK) - 1]} ${c.get(Calendar.DAY_OF_MONTH)} ${months[c.get(Calendar.MONTH)]}"
@@ -154,7 +162,7 @@ object Notif {
             .setAutoCancel(true)
             .setOnlyAlertOnce(ch == CH_LIVE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setColor(0xFF0E7C86.toInt())
+            .setColor(0xFF3F4A6F.toInt())
         actions.forEach { b.addAction(it) }
         try { NotificationManagerCompat.from(c).notify(id, b.build()) } catch (e: SecurityException) { }
     }

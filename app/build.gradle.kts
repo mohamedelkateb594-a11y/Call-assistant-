@@ -11,6 +11,8 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        // مفتاح Gemini بيتدمج في البرنامج وقت البناء من سرّ GitHub اسمه GEMINI_API_KEY (مش مكتوب في الكود)
+        buildConfigField("String", "GEMINI_API_KEY", "\"${System.getenv("GEMINI_API_KEY") ?: ""}\"")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -21,7 +23,10 @@ android {
         // تصريح على مستوى المشروع لواجهات Pager التجريبية (نفس تصريح @file:OptIn في Shell.kt)
         freeCompilerArgs += "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi"
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
 }
 dependencies {
