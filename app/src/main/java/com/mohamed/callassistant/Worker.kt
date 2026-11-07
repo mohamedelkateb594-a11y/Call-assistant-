@@ -139,10 +139,16 @@ object Pipeline {
             val appt = if (apptRaw > System.currentTimeMillis()) apptRaw else 0L
             val rec = CallRecord(
                 id, number, name, start, dur, a.title, a.summary, a.keyPoints, a.transcript,
-                appt, a.apptNote, f.path, "done", "", if (appt > 0) "pending" else ""
+                appt, a.apptNote, f.path, "done", "", if (appt > 0) "pending" else "",
+                a.tasks, a.facts, a.category, old?.starred ?: false
             )
             Store.upsert(c, rec)
             Prefs.markProcessed(c, f.path)
+            TaskOps.schedule(c, rec)
+            // مسح التسجيل بعد التلخيص (لو مفعّل من الإعدادات)
+            if (XPrefs.autoDelete(c)) {
+                try { f.delete() } catch (e: Exception) { }
+            }
             Notif.post(c, id.hashCode(), "ملخص مكالمة " + (name ?: number.ifBlank { "رقم مجهول" }), a.summary)
             // تأكيدات آخر المكالمة
             Contacts.ask(c, rec)
